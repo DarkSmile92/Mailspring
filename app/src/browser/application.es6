@@ -1,6 +1,6 @@
 /* eslint global-require: "off" */
 
-import { BrowserWindow, Menu, app, ipcMain, dialog } from 'electron';
+import { BrowserWindow, Menu, app, ipcMain, dialog, nativeImage } from 'electron';
 
 import fs from 'fs-plus';
 import url from 'url';
@@ -8,7 +8,7 @@ import path from 'path';
 import proc from 'child_process';
 import { EventEmitter } from 'events';
 
-import { localized } from '../intl';
+import { localized, initializeLocalization } from '../intl';
 import WindowManager from './window-manager';
 import FileListCache from './file-list-cache';
 import ConfigMigrator from './config-migrator';
@@ -29,6 +29,8 @@ let clipboard = null;
 export default class Application extends EventEmitter {
   async start(options) {
     const { resourcePath, configDirPath, version, devMode, specMode, safeMode } = options;
+
+    initializeLocalization({ configDirPath });
 
     // Normalize to make sure drive letter case is consistent on Windows
     this.resourcePath = resourcePath;
@@ -586,6 +588,12 @@ export default class Application extends EventEmitter {
         return;
       }
       mainWindow.browserWindow.webContents.send('action-bridge-message', ...args);
+    });
+
+    ipcMain.on('write-image-to-clipboard', (event, dataURL) => {
+      // This can't be done from the renderer due to https://github.com/electron/electron/issues/8151
+      clipboard = require('electron').clipboard;
+      clipboard.writeImage(nativeImage.createFromDataURL(dataURL));
     });
 
     ipcMain.on('write-text-to-selection-clipboard', (event, selectedText) => {
